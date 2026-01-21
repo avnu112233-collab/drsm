@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Relief Management System - Mangalore</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Top Navigation Bar -->
+    <nav class="top-navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <button class="hamburger-menu" id="hamburgerMenu" onclick="toggleMobileMenu()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <i class="fas fa-heartbeat"></i>
+                <span>DRMS - Sahyadri College Emergency Response</span>
+            </div>
+            <div class="nav-actions" id="navActions">
+                <span id="currentUserRole" class="user-indicator">User Dashboard</span>
+                <button class="btn btn--primary btn--sm" onclick="showAdminLogin()">
+                    <i class="fas fa-shield-alt"></i> Admin Login
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages Container -->
+    <div class="flash-messages" id="flashMessages"></div>
+
+    <!-- Admin Login Modal -->
+    <div class="modal hidden" id="adminLoginModal">
+        <div class="modal-overlay" onclick="closeAdminLogin()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-shield-alt"></i> Administrator Access</h3>
+                <button class="modal-close" onclick="closeAdminLogin()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="adminLoginForm" onsubmit="handleAdminLogin(event)">
+                    <div class="form-group">
+                        <label class="form-label">Admin Password</label>
+                        <input type="password" class="form-control" id="adminPassword" 
+                               placeholder="Enter admin password (121212)" required>
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--full-width">
+                        <i class="fas fa-sign-in-alt"></i> Access Administrator Dashboard
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Route Information Modal -->
+    <div class="modal hidden" id="routeInfoModal">
+        <div class="modal-overlay" onclick="closeRouteInfoModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-route"></i> Route Information</h3>
+                <button class="modal-close" onclick="closeRouteInfoModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="routeInfoContent">
+                    <div class="loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Calculating optimal route...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <main class="main-dashboard">
+        <div class="container">
+            <!-- Dashboard Header -->
+            <div class="dashboard-header">
+                <h1><i class="fas fa-tachometer-alt"></i> Emergency Response Command Center</h1>
+                <p><i class="fas fa-map-marker-alt"></i> Base: Sahyadri College of Engineering & Management, Mangalore - 575007</p>
+                
+                <!-- Real-time Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon emergency">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="totalRequests">0</div>
+                            <div class="stat-label">Active Requests</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon warning">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="pendingRequests">0</div>
+                            <div class="stat-label">Pending Follow-ups</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon success">
+                            <i class="fas fa-boxes"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="availableResources">0</div>
+                            <div class="stat-label">Available Resources</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon info">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="allocationRate">0%</div>
+                            <div class="stat-label">Allocation Success Rate</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Grid -->
+            <div class="main-grid">
+                <!-- Interactive Map Section -->
+                <section class="map-section card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-map-marked-alt"></i> Real-Time Mangalore Relief Map</h2>
+                        <div class="map-controls">
+                            <button class="btn btn--primary btn--sm" id="resourcesToggle" onclick="toggleMapLayer('resources')">
+                                <i class="fas fa-boxes"></i> Resources
+                            </button>
+                            <button class="btn btn--primary btn--sm" id="requestsToggle" onclick="toggleMapLayer('requests')">
+                                <i class="fas fa-exclamation-triangle"></i> Requests
+                            </button>
+                            <button class="btn btn--success btn--sm" onclick="optimizeAllRoutes()">
+                                <i class="fas fa-route"></i> Optimize Routes
+                            </button>
+                        </div>
+                    </div>
+                    <div class="map-container" style="position: relative; height: 60vh;">
+                        <div id="mangaloreMap"></div>
+                        <div class="map-spinner hidden" id="mapSpinner">
+                            <div class="spinner-content">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span>Loading route...</span>
+                            </div>
+                        </div>
+                        <div class="map-legend">
+                            <div class="legend-title">Map Legend</div>
+                            <div class="legend-item">
+                                <span class="legend-marker available"></span>
+                                <span>Available Resources</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-marker partial"></span>
+                                <span>Partial Resources</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-marker deployed"></span>
+                                <span>Deployed Resources</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-marker request-high"></span>
+                                <span>High Priority Request</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-marker request-partial"></span>
+                                <span>Partially Fulfilled</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-marker request-complete"></span>
+                                <span>Request Complete</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Quick Request Submission -->
+                <section class="quick-request card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-plus-circle"></i> Quick Emergency Request</h2>
+                        <span class="status-badge status-live">Live</span>
+                    </div>
+                    <form id="quickRequestForm" onsubmit="handleQuickRequest(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Resource Type</label>
+                                <select class="form-control" id="quickResourceType" required>
+                                    <option value="">Select emergency resource</option>
+                                    <option value="Beds">Beds for Shelter</option>
+                                    <option value="Food Packages">Food Packages</option>
+                                    <option value="Water Supply">Water Supply</option>
+                                    <option value="Medical Team">Medical Team</option>
+                                    <option value="Rescue Team">Rescue Team</option>
+                                    <option value="Shelter Tents">Temporary Shelter Tents</option>
+                                    <option value="Fishing Boats">Fishing Boats</option>
+                                    <option value="Agriculture Equipment">Agriculture Equipment</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Quantity Needed</label>
+                                <input type="number" class="form-control" id="quickQuantity" min="1" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Severity Level</label>
+                            <select class="form-control" id="quickSeverity" required>
+                                <option value="">Select severity</option>
+                                <option value="1">1 - Minor (No immediate danger)</option>
+                                <option value="2">2 - Low (Limited impact)</option>
+                                <option value="3">3 - Moderate (Significant concern)</option>
+                                <option value="4">4 - High (Serious situation)</option>
+                                <option value="5">5 - Critical (Life threatening)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Individuals Affected</label>
+                            <input type="number" class="form-control" id="quickIndividuals" min="1" required>
+                        </div>
+                        <button type="button" class="btn btn--outline btn--full-width mb-8" onclick="showAdvancedRequestModal()">
+                            <i class="fas fa-map-pin"></i> Pin Location on Map (Advanced)
+                        </button>
+                        <button type="submit" class="btn btn--primary btn--full-width">
+                            <i class="fas fa-paper-plane"></i> Submit Emergency Request
+                        </button>
+                    </form>
+                </section>
+
+                <!-- Active Requests Table -->
+                <section class="requests-section card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-list-ul"></i> Active Relief Requests</h2>
+                        <div class="table-actions">
+                            <span id="requestsCount" class="count-badge">0 requests</span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Request ID</th>
+                                    <th>Resource Type</th>
+                                    <th>Quantity</th>
+                                    <th>Location</th>
+                                    <th>Priority</th>
+                                    <th>Status</th>
+                                    <th>Progress</th>
+                                    <th>Route</th>
+                                    <th class="admin-only">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="requestsTableBody">
+                                <tr>
+                                    <td colspan="9" class="loading-row">Loading requests...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Resources Inventory -->
+                <section class="resources-section card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-warehouse"></i> Resource Inventory</h2>
+                        <div class="table-actions">
+                            <button class="btn btn--primary btn--sm admin-only" onclick="showAddResourceModal()">
+                                <i class="fas fa-plus"></i> Add Resource
+                            </button>
+                            <span id="resourcesCount" class="count-badge">0 resources</span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Resource ID</th>
+                                    <th>Type</th>
+                                    <th>Total</th>
+                                    <th>Available</th>
+                                    <th>Location</th>
+                                    <th>Status</th>
+                                    <th>Utilization</th>
+                                    <th class="admin-only">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resourcesTableBody">
+                                <tr>
+                                    <td colspan="8" class="loading-row">Loading resources...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- AI Predictions Panel -->
+                <section class="predictions-section card">
+                    <div class="section-header">
+                        <h2><i class="fas fa-brain"></i> AI Demand Predictions</h2>
+                        <div class="demo-badge">ML Simulation</div>
+                    </div>
+                    <div class="predictions-grid" id="predictionsGrid">
+                        <!-- Dynamic ML predictions -->
+                    </div>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <!-- Advanced Request Modal with Map -->
+    <div class="modal hidden" id="advancedRequestModal">
+        <div class="modal-overlay" onclick="closeAdvancedRequestModal()"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-pin"></i> Submit Request with Location Pinning</h3>
+                <button class="modal-close" onclick="closeAdvancedRequestModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="advancedRequestForm" onsubmit="handleAdvancedRequest(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Resource Type</label>
+                            <select class="form-control" id="advancedResourceType" required>
+                                <option value="">Select resource type</option>
+                                <option value="Beds">Beds for Shelter</option>
+                                <option value="Food Packages">Food Packages</option>
+                                <option value="Water Supply">Water Supply</option>
+                                <option value="Medical Team">Medical Team</option>
+                                <option value="Rescue Team">Rescue Team</option>
+                                <option value="Shelter Tents">Temporary Shelter Tents</option>
+                                <option value="Fishing Boats">Fishing Boats</option>
+                                <option value="Agriculture Equipment">Agriculture Equipment</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Quantity Required</label>
+                            <input type="number" class="form-control" id="advancedQuantity" min="1" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Severity Level</label>
+                            <select class="form-control" id="advancedSeverity" required>
+                                <option value="">Select severity</option>
+                                <option value="1">1 - Minor</option>
+                                <option value="2">2 - Low</option>
+                                <option value="3">3 - Moderate</option>
+                                <option value="4">4 - High</option>
+                                <option value="5">5 - Critical</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Individuals Affected</label>
+                            <input type="number" class="form-control" id="advancedIndividuals" min="1" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Location Description</label>
+                        <input type="text" class="form-control" id="advancedLocation" 
+                               placeholder="e.g., Adyar Village, Kankanady Market Area" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Click on map to pin exact location</label>
+                        <div id="requestMapContainer" style="height: 350px; border: 1px solid var(--color-border); border-radius: var(--radius-base);"></div>
+                        <input type="hidden" id="pinnedCoordinates">
+                        <small class="form-text">Click anywhere on the map above to set the exact request location</small>
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--full-width">
+                        <i class="fas fa-paper-plane"></i> Submit Detailed Request
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Resource Modal (Admin Only) -->
+    <div class="modal hidden admin-only" id="addResourceModal">
+        <div class="modal-overlay" onclick="closeAddResourceModal()"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-plus-circle"></i> Add New Resource</h3>
+                <button class="modal-close" onclick="closeAddResourceModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addResourceForm" onsubmit="handleAddResource(event)">
+                    <div class="form-group">
+                        <label class="form-label">Resource Type</label>
+                        <input type="text" class="form-control" id="newResourceType" 
+                               placeholder="e.g., Medical Supplies, Rescue Vehicles" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Total Quantity</label>
+                            <input type="number" class="form-control" id="newResourceTotal" min="1" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Currently Available</label>
+                            <input type="number" class="form-control" id="newResourceAvailable" min="0" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Location</label>
+                        <input type="text" class="form-control" id="newResourceLocation" 
+                               placeholder="e.g., Main Building, Block A" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contact Email</label>
+                        <input type="email" class="form-control" id="newResourceContact" 
+                               placeholder="resource-manager@scem.in" required>
+                    </div>
+                    <button type="submit" class="btn btn--primary btn--full-width">
+                        <i class="fas fa-plus"></i> Add Resource to Inventory
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
